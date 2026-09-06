@@ -381,7 +381,6 @@ theorem Embedding.isNClique_map {G' : SimpleGraph β} (f : G ↪g G') {n : ℕ} 
 
 end NClique
 
-
 /-! ### Graphs without cliques -/
 
 
