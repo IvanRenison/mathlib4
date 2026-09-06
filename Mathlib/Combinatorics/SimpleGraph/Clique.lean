@@ -238,9 +238,9 @@ theorem IsClique.image {G' : SimpleGraph β} (f : G →g G') (h : G.IsClique s) 
   rintro _ ⟨u, hu, rfl⟩ _ ⟨v, hv, rfl⟩ hne
   exact f.map_adj <| h hu hv (mt (congrArg f) hne)
 
-theorem Embedding.isClique_iff {G' : SimpleGraph β} (f : G ↪g G') :
-    G.IsClique s ↔ G'.IsClique (f '' s) :=
-  ⟨.image f.toHom, (f.map_adj_iff.mp <| · ⟨·, ·, rfl⟩ ⟨·, ·, rfl⟩ <| f.injective.ne ·)⟩
+theorem Embedding.isClique_image {G' : SimpleGraph β} (f : G ↪g G') :
+    G'.IsClique (f '' s) ↔ G.IsClique s :=
+  ⟨(f.map_adj_iff.mp <| · ⟨·, ·, rfl⟩ ⟨·, ·, rfl⟩ <| f.injective.ne ·), .image f.toHom⟩
 
 end Clique
 
@@ -375,21 +375,11 @@ theorem isNClique_induce_iff (s : Set α) (t : Finset s) (n : ℕ) :
     (G.induce s).IsNClique n t ↔ G.IsNClique n (t.map (.subtype _)) := by
   simp [isNClique_iff, isClique_induce_iff]
 
-theorem Iso.isNClique_iff {G : SimpleGraph α} {G' : SimpleGraph β} (f : G ≃g G') (n : ℕ)
-    (s : Finset α) : G.IsNClique n s ↔ G'.IsNClique n (s.map f) := by
-  have hcast : SetLike.coe (s.map f) = (f '' s) := s.coe_map f.toEquiv.toEmbedding
-  constructor
-  · rintro ⟨h, hc⟩
-    have hc' : #((s.map f) : Finset β) = n := (s.card_map _).trans hc
-    have h' : G'.IsClique (f '' s) := f.toEmbedding.isClique_iff.mp h
-    exact ⟨hcast ▸ h', hc'⟩
-  · rintro ⟨h', hc'⟩
-    have hc : #s = n := (hc'.symm.trans (s.card_map _)).symm
-    have h : G.IsClique s := f.toEmbedding.isClique_iff.mpr (hcast ▸ h')
-    exact ⟨h, hc⟩
+theorem Embedding.isNClique_map {G' : SimpleGraph β} (f : G ↪g G') {n : ℕ} {s : Finset α} :
+    G'.IsNClique n (s.map f.toEmbedding) ↔ G.IsNClique n s := by
+  simp [isNClique_iff, f.isClique_image]
 
 end NClique
-
 
 
 /-! ### Graphs without cliques -/
@@ -677,10 +667,10 @@ theorem cliqueFreeOn_iff_cliqueFree_subgraph (s : Set α) (n : ℕ) :
     G.CliqueFreeOn s n ↔ (G.induce s).CliqueFree n := by
   simp [CliqueFreeOn, cliqueFree_induce_iff]
 
-theorem Iso.cliqueFreeOn_iff {G : SimpleGraph α} {G' : SimpleGraph β} (f : G ≃g G') (s : Set α)
-    (n : ℕ) : G.CliqueFreeOn s n ↔ G'.CliqueFreeOn (f '' s) n := by
+theorem Embedding.cliqueFreeOn_iff {G : SimpleGraph α} {G' : SimpleGraph β}
+    (f : G ↪g G') (s : Set α) (n : ℕ) : G.CliqueFreeOn s n ↔ G'.CliqueFreeOn (f '' s) n := by
   repeat rw [cliqueFreeOn_iff_cliqueFree_subgraph]
-  exact (f.induce f.toEquiv.bijOn_image).cliqueFree_iff n
+  exact (f.induce_image.cliqueFree_iff n).symm
 
 end CliqueFreeOn
 
@@ -759,7 +749,7 @@ theorem Iso.cliqueSet_eq {G : SimpleGraph α} {G' : SimpleGraph β} (f : G ≃g 
   simp only [cliqueSet, Set.mem_ofPred_eq, Set.mem_image]
   constructor
   · intro hs
-    exact ⟨s.map f, (f.isNClique_iff n s).mp hs, by simp [Finset.map_map]⟩
+    exact ⟨s.map f, f.toEmbedding.isNClique_map.mpr hs, by simp [Finset.map_map]⟩
   · rintro ⟨s', hs', hss'⟩
     rw [show (f.symm : β ≃ α) = (f : α ≃ β).symm by rfl] at hss'
     let f' : β → α := (f : α ≃ β).symm.toEmbedding
@@ -769,8 +759,8 @@ theorem Iso.cliqueSet_eq {G : SimpleGraph α} {G' : SimpleGraph β} (f : G ≃g 
     dsimp [f']  at hs'
     rw [← (f : α ≃ β).image_eq_preimage_symm_of_finset s,
       show ((f : α ≃ β) : α → β) = (f : α ≃ β).toEmbedding by rfl,
-      ← s.map_eq_image, ← f.isNClique_iff] at hs'
-    exact hs'
+      ← s.map_eq_image] at hs'
+    exact f.toEmbedding.isNClique_map.mp hs'
 
 end CliqueSet
 
@@ -907,11 +897,9 @@ theorem Iso.cliqueNum_eq {G : SimpleGraph α} {G' : SimpleGraph β} (f : G ≃g 
   ext n
   constructor
   · rintro ⟨s, hs⟩
-    have hs' := (f.isNClique_iff n s).mp hs
-    exact ⟨_, (f.isNClique_iff n s).mp hs⟩
+    exact ⟨_, f.toEmbedding.isNClique_map.mpr hs⟩
   · rintro ⟨s', hs'⟩
-    have hs := (f.symm.isNClique_iff n s').mp hs'
-    exact ⟨_, hs⟩
+    exact ⟨_, f.symm.toEmbedding.isNClique_map.mpr hs'⟩
 
 end CliqueNumber
 
@@ -971,7 +959,7 @@ theorem Iso.cliqueFinset_eq {G : SimpleGraph α} [DecidableRel G.Adj]
     (G.cliqueFinset n).map (f : α ≃ β).finsetCongr.toEmbedding = G'.cliqueFinset n := by
   unfold cliqueFinset
   ext s'
-  simp [f.isNClique_iff, Equiv.finsetCongr_symm, Finset.map_map]
+  simp [← f.toEmbedding.isNClique_map, Equiv.finsetCongr_symm, Finset.map_map]
 
 end CliqueFinset
 
