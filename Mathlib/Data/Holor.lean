@@ -47,7 +47,9 @@ def HolorIndex (ds : List ℕ) : Type :=
 
 namespace HolorIndex
 
-variable {ds₁ ds₂ ds₃ : List ℕ}
+variable {ds ds₁ ds₂ ds₃ : List ℕ}
+
+theorem eq_iff_val_eq {t t' : HolorIndex ds} : t = t' ↔ t.val = t'.val := Subtype.ext_iff
 
 /-- Take the first elements of a `HolorIndex`. -/
 def take : ∀ {ds₁ : List ℕ}, HolorIndex (ds₁ ++ ds₂) → HolorIndex ds₁
@@ -78,6 +80,38 @@ theorem drop_take : ∀ t : HolorIndex (ds₁ ++ ds₂ ++ ds₃), t.assocRight.d
 
 theorem drop_drop : ∀ t : HolorIndex (ds₁ ++ ds₂ ++ ds₃), t.assocRight.drop.drop = t.drop
   | ⟨is, h⟩ => Subtype.ext (by simp [assocRight, drop, cast_type, List.drop_drop])
+
+theorem type_eq_of_list_eq (h : ds₁ = ds₂) : HolorIndex ds₁ = HolorIndex ds₂ := h ▸ rfl
+
+theorem heq_of_val_eq (h : ds₁ = ds₂) {t₁ : HolorIndex ds₁} {t₂ : HolorIndex ds₂}
+    (hval : t₁.val = t₂.val) : t₁ ≍ t₂ := by
+  subst h
+  exact heq_of_eq (eq_iff_val_eq.mpr hval)
+
+--theorem cast_eq_of_val_eq (h : ds₁ = ds₂) {t₁ : HolorIndex ds₁} {t₂ : HolorIndex ds₂}
+--    (hval : t₁.val = t₂.val) : cast (type_eq_of_list_eq h) t₁ = t₂ :=
+--  cast_eq_iff_heq.mpr (heq_of_val_eq h hval)
+
+theorem app_reverse_reverse : HolorIndex ds.reverse.reverse = HolorIndex ds :=
+  type_eq_of_list_eq ds.reverse_reverse
+
+def castReverse (h : ds₁.reverse = ds₂) (t : HolorIndex ds₁) : HolorIndex ds₂ := ⟨
+  t.val.reverse, h ▸ rel_reverse t.2⟩
+
+def reverse (t : HolorIndex ds) : HolorIndex ds.reverse := castReverse rfl t
+
+theorem reverse_reverse_heq (t : HolorIndex ds) : t.reverse.reverse ≍ t := by
+  apply heq_of_val_eq ds.reverse_reverse
+  simp only [reverse, castReverse, List.reverse_reverse]
+
+@[simp]
+theorem cast_reverse_reverse (t : HolorIndex ds) : cast app_reverse_reverse t.reverse.reverse = t :=
+  cast_eq_iff_heq.mpr (reverse_reverse_heq t)
+
+theorem drop_castReverse (t : HolorIndex (ds₁ ++ ds₂)) :
+    (castReverse reverse_append t).drop = t.take.reverse := by
+
+  sorry
 
 end HolorIndex
 
@@ -338,5 +372,89 @@ theorem cprank_upper_bound [Ring α] : ∀ {ds}, ∀ x : Holor α ds, cprank x �
   letI := Classical.decPred fun n : ℕ => CPRankMax n x
   Nat.find_min' ⟨ds.prod, show (fun n => CPRankMax n x) ds.prod from cprankMax_upper_bound x⟩
     (cprankMax_upper_bound x)
+
+theorem type_eq_of_list_eq (h : ds₁ = ds₂) : Holor α ds₁ = Holor α ds₂ := h ▸ rfl
+
+theorem heq_of_funext (h : ds₁ = ds₂) {x : Holor α ds₁} {y : Holor α ds₂}
+    (hfun : ∀ t₁ t₂, t₁ ≍ t₂ → x t₁ ≍ y t₂) : x ≍ y := by
+  subst h
+  exact heq_of_eq (funext fun t ↦ eq_of_heq (hfun t t HEq.rfl))
+
+theorem cast_app (h : ds₁ = ds₂) (x : Holor α ds₁) (t : HolorIndex ds₂) :
+    cast (type_eq_of_list_eq h) x t = x (cast (HolorIndex.type_eq_of_list_eq h.symm) t) := by
+  subst h
+  rfl
+
+--theorem app_heq_of funext (h : ds₁ = ds₂) (t₁ : HolorIndex ds₁) (t₂ : HolorIndex ds₂) (ht : t₁ ≍ t₂)
+--    (x : Holor α ds₁) (y : Holor α ds₂) : x t₁ ≍ y t₂ ↔ ∀
+
+--theorem cast_eq_fun_eq (h : ds₁ = ds₂) {x : Holor α ds₁} {y : Holor α ds₂}
+--    (hfun : )
+--    : cast (type_eq_of_list_eq h) x = y := sorry
+
+section transpose
+
+theorem app_reverse_reverse : Holor α ds.reverse.reverse = Holor α ds := by
+  rw [reverse_reverse]
+
+def castTranspose (h : ds₁ = ds₂.reverse) (x : Holor α ds₁) : Holor α ds₂ :=
+  fun t ↦ x (t.castReverse h.symm)
+
+def transpose (x : Holor α ds) : Holor α (ds.reverse) := castTranspose ds.reverse_reverse.symm x
+
+theorem transpose_app (x : Holor α ds) (t : HolorIndex ds.reverse) :
+    x.transpose t = x (t.castReverse ds.reverse_reverse) := rfl
+
+theorem transpose_transpose_heq (x : Holor α ds) :
+    x.transpose.transpose ≍ x := by
+  apply heq_of_funext ds.reverse_reverse
+  intro t' t ht
+  simp only [transpose_app]
+  congr
+  have ht' : cast (HolorIndex.type_eq_of_list_eq ds.reverse_reverse) t' = t :=
+    cast_eq_iff_heq.mpr ht
+  rw [← ht']
+  apply Subtype.ext
+  obtain ⟨is, h⟩ := t'
+  simp [HolorIndex.castReverse, HolorIndex.cast_type]
+
+theorem transpose_transpose (x : Holor α ds) :
+    cast Holor.app_reverse_reverse x.transpose.transpose = x :=
+  cast_eq_iff_heq.mpr (transpose_transpose_heq x)
+
+@[simp]
+theorem transpose_zero [Zero α] : (0 : Holor α ds).transpose = 0 := rfl
+
+theorem transpose_add [Add α] (x y : Holor α ds) : (x + y).transpose = x.transpose + y.transpose :=
+  rfl
+
+theorem transpose_neg [Neg α] (x : Holor α ds) : (-x).transpose = -x.transpose := rfl
+
+theorem transpose_smul [Mul α] (a : α) (x : Holor α ds) : (a • x).transpose = a • x.transpose :=
+  rfl
+
+example : (ds₁ ++ ds₂).reverse = ds₂.reverse ++ ds₁.reverse := reverse_append
+
+lemma aux : ds₁ ++ ds₂ = (ds₂.reverse ++ ds₁.reverse).reverse := by
+  exact (reverse_eq_append_iff.mpr rfl).symm
+
+theorem castTranspose_mul_heq [CommSemigroup α] (x : Holor α ds₁) (y : Holor α ds₂) :
+    (x ⊗ y).castTranspose (reverse_eq_append_iff.mpr rfl).symm = y.transpose ⊗ x.transpose := by
+  dsimp [transpose]
+  funext t
+  dsimp [castTranspose, mul]
+  rw [mul_comm]
+  rw [t.drop_castReverse]
+
+  sorry
+
+theorem transpose_mul_heq [CommSemigroup α] (x : Holor α ds₁) (y : Holor α ds₂) :
+    (x ⊗ y).transpose ≍ y.transpose ⊗ x.transpose := by
+  apply heq_of_funext reverse_append
+  intro t t' ht
+  sorry
+
+
+end transpose
 
 end Holor
